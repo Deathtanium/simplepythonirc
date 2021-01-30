@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import socket
 import threading
 
@@ -24,13 +25,16 @@ class Client:
         self.main_thread.start()
         self.receive()
     
-    
     #main messaging loop
     def msgsend_loop(self):
         while True:
-            message = input()
-            if len(message)>1:
-                self.sock.send(message.encode('utf-8'))
+            try:
+                message = input()
+                if len(message)>1:
+                    self.sock.send(message.encode('utf-8'))
+            except KeyboardInterrupt:
+                print("\nClient stopping1")
+                exit()
     
     #loop for updating message history
     def receive(self):
@@ -39,37 +43,23 @@ class Client:
                 message = self.sock.recv(1024).decode('utf-8')
                 if message == 'NICK':
                     self.sock.send(self.nickname.encode('utf-8'))
-                elif message=='':
+                #why is is sending blank data when closed?
+                elif message=='1':
+                    print("\nServer shutdown")
                     self.sock.close()
-                    print("Server Unreachable")
-                    exit(0)
+                    break
+                elif message=='':
+                    continue
                 else:
                     print(message)
-            except:
-                pass
-
+            except KeyboardInterrupt:
+                print("\nKeyboard halt signal")
+                break
+        exit()
 #driver code
 try:
     client = Client(HOST, PORT)
 except ConnectionRefusedError:
-    print("Server is down")
-except KeyboardInterrupt:
-    print("Client stopping")
+    print("\nServer is unreachable")
 except:
-    print("Generic error")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    print("\nClient stopped")

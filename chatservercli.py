@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import socket
 import threading
@@ -8,15 +9,16 @@ HOST = '192.168.0.122' #84.117.187.56 for
 PORT = 9090
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind((HOST, PORT))
 
 server.listen()
 
-logFile = open('log.txt', 'w')
+
 
 clients = []
 nicknames = []
-threads = []
+
 
 def broadcast(message):
     for client in clients:
@@ -29,29 +31,31 @@ def handle(client):
             message = f"<{nicknames[clients.index(client)]}> {msg}"
             if len(msg) > 1:
                 #logging
-                stdout_backup = sys.stdout
-                sys.stdout = logFile
-                print(message)
-                sys.stdout = stdout_backup
+                logFile = open('log.txt', 'a')
+                logFile.write(f"\n{message}")
+                logFile.close()
                 print(message)
                 
                 #send the message to everyone
                 broadcast(f"{message}")
+            if msg == '':
+                #this should be triggered if the client becomes unreachable
+                index = clients.index(client)
+                nickname = nicknames[index]
+                nicknames.remove(nickname)
+                
+                clients.remove(client)
+                client.shutdown(1)
+                
+                #logging
+                logFile = open('log.txt', 'a')
+                logFile.write(f"\n{nickname} disconnected.")
+                logFile.close()
+                
+                print(f"{nickname} disconnected.")
+                break
         except:
-            #this should be triggered if the client becomes unreachable
-            index = clients.index(client)
-            nickname = nicknames[index]
-            nicknames.remove(nickname)
-            
-            clients.remove(client)
-            client.shutdown(1)
-            
-            print(f"{nickname} disconnected.")
-            
-            thread = threads[index]
-            threads.remove(thread)
-            thread.stop()
-            break
+            pass
         
 def receive():              
     while True:
@@ -64,11 +68,10 @@ def receive():
         clients.append(client)
 
         #logging
-        msg = f"{nickname} connected to the server from {str(address)}"
-        stdout_backup = sys.stdout
-        sys.stdout = logFile
-        print(msg)
-        sys.stdout = stdout_backup
+        msg = f"\n{nickname} connected to the server from {str(address)}"
+        logFile = open('log.txt', 'a')
+        logFile.write(msg)
+        logFile.close()
         print(msg)
         
         broadcast(f"{nickname} connected to the server")
@@ -76,14 +79,22 @@ def receive():
         thread = threading.Thread(target=handle, args=(client,))
         thread.daemon = True
         thread.start()
-        
-        threads.append(thread)
 
 print ("Server running")
 try:
     receive()
 except KeyboardInterrupt:
+    broadcast('1')
     for client in clients:
-        client.close(1)
-    server.shutdown(1)
-    print("Server is stopping")
+        client.close()
+    server.close()
+    print("\nServer is stopping")
+    exit()
+except BrokenPipeError:
+    for client in clients:
+        client.close()
+    server.close()
+    clients = []
+    nicknames = []
+    os.execv(sys.argv[0], sys.argv)
+    
