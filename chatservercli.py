@@ -16,6 +16,7 @@ logFile = open('log.txt', 'w')
 
 clients = []
 nicknames = []
+threads = []
 
 def broadcast(message):
     for client in clients:
@@ -25,7 +26,7 @@ def handle(client):
     while True:
         try:
             msg = client.recv(1024).decode('utf-8')
-            message = f"{nicknames[clients.index(client)]}: {msg}"
+            message = f"<{nicknames[clients.index(client)]}> {msg}"
             if len(msg) > 1:
                 #logging
                 stdout_backup = sys.stdout
@@ -43,9 +44,13 @@ def handle(client):
             nicknames.remove(nickname)
             
             clients.remove(client)
-            client.close()
+            client.shutdown(1)
             
             print(f"{nickname} disconnected.")
+            
+            thread = threads[index]
+            threads.remove(thread)
+            thread.stop()
             break
         
 def receive():              
@@ -69,8 +74,16 @@ def receive():
         broadcast(f"{nickname} connected to the server")
 
         thread = threading.Thread(target=handle, args=(client,))
-        
+        thread.daemon = True
         thread.start()
+        
+        threads.append(thread)
 
 print ("Server running")
-receive()
+try:
+    receive()
+except KeyboardInterrupt:
+    for client in clients:
+        client.close(1)
+    server.shutdown(1)
+    print("Server is stopping")

@@ -17,18 +17,20 @@ class Client:
         self.sock.connect((host, port)) #host = domain name/WAN IP of the server
 
         #setting the two parralel threads
-        main_thread = threading.Thread(target=self.msgsend_loop)
-        receive_thread = threading.Thread(target=self.receive)
+        self.main_thread = threading.Thread(target=self.msgsend_loop)
+        self.main_thread.daemon = True
 
         #starting the threads
-        main_thread.start()
-        receive_thread.start()
+        self.main_thread.start()
+        self.receive()
+    
     
     #main messaging loop
     def msgsend_loop(self):
         while True:
             message = input()
-            self.sock.send(message.encode('utf-8'))
+            if len(message)>1:
+                self.sock.send(message.encode('utf-8'))
     
     #loop for updating message history
     def receive(self):
@@ -37,21 +39,24 @@ class Client:
                 message = self.sock.recv(1024).decode('utf-8')
                 if message == 'NICK':
                     self.sock.send(self.nickname.encode('utf-8'))
+                elif message=='':
+                    self.sock.close()
+                    print("Server Unreachable")
+                    exit(0)
                 else:
                     print(message)
-            except ConnectionAbortedError:
-                print("ConnectionAbortedError, do CTRL-C to exit")
-                exit(0)
-                break
             except:
-                print("Generic Error, do CTRL-C to exit")
-                exit(0)
-                break
+                pass
 
 #driver code
-client = Client(HOST, PORT)
-
-
+try:
+    client = Client(HOST, PORT)
+except ConnectionRefusedError:
+    print("Server is down")
+except KeyboardInterrupt:
+    print("Client stopping")
+except:
+    print("Generic error")
 
 
 
